@@ -635,6 +635,11 @@ export default async function foodRoutes(fastify: FastifyInstance) {
       });
     }
 
+    const updated = await prisma.aiFoodRecognition.update({
+      where: { userId_loggedDate: { userId, loggedDate: today } },
+      data: { count: { increment: 1 } },
+    });
+
     try {
       const result = await recognizeFoodWithGemini(
         {
@@ -647,11 +652,6 @@ export default async function foodRoutes(fastify: FastifyInstance) {
         (message, meta) => req.log.warn(meta ?? {}, message),
       );
 
-      const updated = await prisma.aiFoodRecognition.update({
-        where: { userId_loggedDate: { userId, loggedDate: today } },
-        data: { count: { increment: 1 } },
-      });
-
       return reply.send({
         ...result,
         remaining: Math.max(0, AI_FOOD_RECOGNIZE_DAILY_LIMIT - updated.count),
@@ -661,7 +661,7 @@ export default async function foodRoutes(fastify: FastifyInstance) {
       const status = err?.statusCode && Number.isFinite(err.statusCode) ? err.statusCode : 502;
       return reply.status(status).send({
         error: err?.message || 'A felismerés sikertelen.',
-        remaining: Math.max(0, AI_FOOD_RECOGNIZE_DAILY_LIMIT - usage.count),
+        remaining: Math.max(0, AI_FOOD_RECOGNIZE_DAILY_LIMIT - updated.count),
         limit: AI_FOOD_RECOGNIZE_DAILY_LIMIT,
       });
     }

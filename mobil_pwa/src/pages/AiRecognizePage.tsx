@@ -192,6 +192,8 @@ export default function AiRecognizePage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressStep, setProgressStep] = useState<string>('progressStepPhoto');
   const [saving, setSaving] = useState(false);
   const [dishName, setDishName] = useState('');
   const [ingredients, setIngredients] = useState<IngredientDraft[]>([]);
@@ -212,6 +214,64 @@ export default function AiRecognizePage() {
   const prefillAppliedRef = useRef(false);
   const amountBaselineRef = useRef<Record<string, MacroSnap>>({});
   const preparedBaselineRef = useRef<IngredientDraft[] | null>(null);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isCancelledRef = useRef(false);
+
+  const stopProgress = () => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+  };
+
+  const cancelRecognize = () => {
+    isCancelledRef.current = true;
+    stopProgress();
+    setBusy(false);
+    setProgress(0);
+    // Request was already sent and counted on the backend daily quota
+    setRemaining((prev) => (prev != null ? Math.max(0, prev - 1) : null));
+  };
+
+  const startProgress = (targetMode: 'photo' | 'text') => {
+    stopProgress();
+    const startStep = targetMode === 'photo' ? 'progressStepPhoto' : 'progressStepText';
+    setProgress(8);
+    setProgressStep(startStep);
+
+    const startTime = Date.now();
+    progressTimerRef.current = setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      let nextPct = 8;
+      let nextStep = startStep;
+
+      if (elapsed < 1.2) {
+        nextPct = 8 + (elapsed / 1.2) * 22;
+        nextStep = startStep;
+      } else if (elapsed < 4.5) {
+        const ratio = (elapsed - 1.2) / 3.3;
+        nextPct = 30 + ratio * 38;
+        nextStep = 'progressStepAnalyze';
+      } else if (elapsed < 8.5) {
+        const ratio = (elapsed - 4.5) / 4.0;
+        nextPct = 68 + ratio * 20;
+        nextStep = 'progressStepNutrition';
+      } else {
+        const extra = elapsed - 8.5;
+        nextPct = Math.min(95, 88 + (1 - Math.exp(-extra / 4)) * 7);
+        nextStep = 'progressStepFinal';
+      }
+
+      setProgress(Math.min(95, Math.round(nextPct)));
+      setProgressStep(nextStep);
+    }, 120);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopProgress();
+    };
+  }, []);
 
   const applyDishMeta = (drafts: IngredientDraft[]) => {
     const first = drafts[0];
@@ -295,18 +355,27 @@ export default function AiRecognizePage() {
   };
 
   const runRecognize = async (opts: { mode: 'photo' | 'text' }) => {
+    isCancelledRef.current = false;
     setBusy(true);
+    startProgress(opts.mode);
     try {
       let payload: Parameters<typeof foodApi.aiRecognize>[0];
       if (opts.mode === 'photo') {
         if (!imageFile) {
+          stopProgress();
+          setBusy(false);
+          setProgress(0);
           setDialog({ title: t('food.errorTitle'), message: t('aiRecognize.needPhoto') });
           return;
         }
         const { base64, mimeType } = await fileToCompressedJpeg(imageFile);
+        if (isCancelledRef.current) return;
         payload = { mode: 'photo', imageBase64: base64, mimeType, locale };
       } else {
         if (!text.trim()) {
+          stopProgress();
+          setBusy(false);
+          setProgress(0);
           setDialog({ title: t('food.errorTitle'), message: t('aiRecognize.needText') });
           return;
         }
@@ -314,6 +383,15 @@ export default function AiRecognizePage() {
       }
 
       const res = await foodApi.aiRecognize(payload);
+      if (isCancelledRef.current) return;
+
+      stopProgress();
+      setProgress(100);
+      setProgressStep('progressStepDone');
+
+      await new Promise((r) => setTimeout(r, 260));
+      if (isCancelledRef.current) return;
+
       const drafts = res.ingredients.map(toDraft);
       setDishName(res.dishName || '');
       setIngredients(drafts);
@@ -321,12 +399,18 @@ export default function AiRecognizePage() {
       setRemaining(res.remaining);
       setMode('result');
     } catch (e) {
+      if (isCancelledRef.current) return;
+      stopProgress();
       setDialog({
         title: t('food.errorTitle'),
         message: getErrorMessage(e, t('aiRecognize.failed')),
       });
     } finally {
-      setBusy(false);
+      if (!isCancelledRef.current) {
+        stopProgress();
+        setBusy(false);
+        setProgress(0);
+      }
     }
   };
 
@@ -636,6 +720,7 @@ export default function AiRecognizePage() {
               <button
                 type="button"
                 className={styles.secondaryBtn}
+                disabled={busy}
                 onClick={() => cameraInputRef.current?.click()}
               >
                 <IconPhotoCamera size={18} color={Colors.dashboard.stroke} />
@@ -644,6 +729,7 @@ export default function AiRecognizePage() {
               <button
                 type="button"
                 className={styles.secondaryBtn}
+                disabled={busy}
                 onClick={() => galleryInputRef.current?.click()}
               >
                 <IconPhotoLibrary size={18} color={Colors.dashboard.stroke} />
@@ -671,17 +757,45 @@ export default function AiRecognizePage() {
                 <p className={styles.noStore}>{t('aiRecognize.photoNotStored')}</p>
               </div>
             )}
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              disabled={!imageFile || busy}
-              onClick={() => runRecognize({ mode: 'photo' })}
-            >
-              {busy ? <span className="spinner" style={{ width: 22, height: 22 }} /> : t('aiRecognize.run')}
-            </button>
-            <button type="button" className={styles.linkBtn} onClick={() => setMode('choose')}>
-              {t('aiRecognize.backToChoose')}
-            </button>
+            {busy ? (
+              <>
+                <div className={styles.progressCard} aria-live="polite" role="status">
+                  <div className={styles.progressHead}>
+                    <div className={styles.progressStatus}>
+                      <span className={styles.progressDot} />
+                      <span className={styles.progressStepText}>
+                        {t(`aiRecognize.${progressStep}`, t('aiRecognize.progressStepAnalyze'))}
+                      </span>
+                    </div>
+                    <span className={styles.progressPercent}>{progress}%</span>
+                  </div>
+                  <div className={styles.progressTrack}>
+                    <div className={styles.progressFill} style={{ width: `${progress}%` }}>
+                      <span className={styles.progressStripes}>
+                        //////// //////// //////// //////// //////// ////////
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button type="button" className={styles.cancelBtn} onClick={cancelRecognize}>
+                  {t('common.cancel')}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={styles.primaryBtn}
+                  disabled={!imageFile}
+                  onClick={() => runRecognize({ mode: 'photo' })}
+                >
+                  {t('aiRecognize.run')}
+                </button>
+                <button type="button" className={styles.linkBtn} onClick={() => setMode('choose')}>
+                  {t('aiRecognize.backToChoose')}
+                </button>
+              </>
+            )}
           </>
         )}
 
@@ -691,21 +805,50 @@ export default function AiRecognizePage() {
             <textarea
               className={styles.textarea}
               value={text}
+              disabled={busy}
               onChange={(e) => setText(e.target.value)}
               rows={5}
               placeholder={t('aiRecognize.textPlaceholder')}
             />
-            <button
-              type="button"
-              className={styles.primaryBtn}
-              disabled={!text.trim() || busy}
-              onClick={() => runRecognize({ mode: 'text' })}
-            >
-              {busy ? <span className="spinner" style={{ width: 22, height: 22 }} /> : t('aiRecognize.run')}
-            </button>
-            <button type="button" className={styles.linkBtn} onClick={() => setMode('choose')}>
-              {t('aiRecognize.backToChoose')}
-            </button>
+            {busy ? (
+              <>
+                <div className={styles.progressCard} aria-live="polite" role="status">
+                  <div className={styles.progressHead}>
+                    <div className={styles.progressStatus}>
+                      <span className={styles.progressDot} />
+                      <span className={styles.progressStepText}>
+                        {t(`aiRecognize.${progressStep}`, t('aiRecognize.progressStepAnalyze'))}
+                      </span>
+                    </div>
+                    <span className={styles.progressPercent}>{progress}%</span>
+                  </div>
+                  <div className={styles.progressTrack}>
+                    <div className={styles.progressFill} style={{ width: `${progress}%` }}>
+                      <span className={styles.progressStripes}>
+                        //////// //////// //////// //////// //////// ////////
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button type="button" className={styles.cancelBtn} onClick={cancelRecognize}>
+                  {t('common.cancel')}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={styles.primaryBtn}
+                  disabled={!text.trim()}
+                  onClick={() => runRecognize({ mode: 'text' })}
+                >
+                  {t('aiRecognize.run')}
+                </button>
+                <button type="button" className={styles.linkBtn} onClick={() => setMode('choose')}>
+                  {t('aiRecognize.backToChoose')}
+                </button>
+              </>
+            )}
           </>
         )}
 
