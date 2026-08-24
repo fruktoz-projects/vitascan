@@ -492,12 +492,19 @@ export async function recognizeFoodWithGemini(
         elapsedMs: Date.now() - startedAt,
       });
 
-      // Quota and rejected images will not improve on retry.
-      if (outcome.failure.kind === 'rate' || outcome.failure.kind === 'image') {
+      // Same image will be rejected by every model.
+      if (outcome.failure.kind === 'image') {
         throw failureToError(outcome.failure, input.locale);
       }
-      // A dead endpoint or network error: skip the remaining configs, try the other model.
-      if (outcome.failure.kind === 'network' || outcome.failure.kind === 'http') break;
+      // Per-model quota/overload, dead endpoint, or network: skip remaining
+      // configs and try the next model in geminiModelChain().
+      if (
+        outcome.failure.kind === 'rate' ||
+        outcome.failure.kind === 'network' ||
+        outcome.failure.kind === 'http'
+      ) {
+        break;
+      }
     }
   }
 
