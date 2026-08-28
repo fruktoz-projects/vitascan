@@ -639,8 +639,9 @@ export default function AiRecognizePage() {
           sourcePreparedFoodId: preparedFoodId,
         });
       } else {
-        const logGroupId = crypto.randomUUID();
         const single = parsed.length === 1;
+        const logGroupId = single ? undefined : crypto.randomUUID();
+        const logGroupName = single ? undefined : (dishLabel || parsed[0]!.name);
         for (const p of parsed) {
           await logApi.create({
             foodName: single ? dishLabel || p.name : p.name,
@@ -655,6 +656,7 @@ export default function AiRecognizePage() {
             source: 'AI',
             date,
             logGroupId,
+            logGroupName,
             sourcePreparedFoodId: preparedFoodId,
           });
         }

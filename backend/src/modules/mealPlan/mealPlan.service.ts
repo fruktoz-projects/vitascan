@@ -525,6 +525,7 @@ async function logTemplateSlot(
             mealType: slot.mealType,
             source: 'MANUAL',
             logGroupId,
+            logGroupName: item.groupName ?? (template.items.length > 1 ? template.name : undefined),
             sourcePreparedFoodId: item.sourcePreparedFoodId,
             createdAt: start,
           },

@@ -558,6 +558,7 @@ export type MealTemplateItem = {
   amount: number;
   sortOrder: number;
   groupKey: string | null;
+  groupName?: string | null;
   sourcePreparedFoodId: string | null;
   sourcePreparedFoodName: string | null;
 };

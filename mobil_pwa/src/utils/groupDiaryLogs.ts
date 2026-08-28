@@ -8,6 +8,7 @@ export type DiaryLogLike = {
   amount?: number | null;
   brand?: string | null;
   logGroupId?: string | null;
+  logGroupName?: string | null;
   sourcePreparedFoodId?: string | null;
   sourcePreparedFoodName?: string | null;
   [key: string]: unknown;
@@ -72,6 +73,7 @@ export function groupDiaryLogs(logs: DiaryLogLike[]): DiaryEntry[] {
         kind: 'group',
         logGroupId: gid,
         title:
+          groupLogs[0]?.logGroupName ||
           groupLogs[0]?.sourcePreparedFoodName ||
           groupLogs[0]?.foodName ||
           'Kész étel',

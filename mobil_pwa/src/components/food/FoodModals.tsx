@@ -687,6 +687,7 @@ export function FoodDetailModal({
             source: logSource,
             date: toLocalDateStr(selectedDate),
             logGroupId,
+            logGroupName: displayName,
             sourcePreparedFoodId: isUuid ? currentFood.id : undefined,
           });
         }
@@ -1060,6 +1061,7 @@ export type DailyLogItem = {
   sugar?: number | null;
   mealType: MealType | string;
   logGroupId?: string | null;
+  logGroupName?: string | null;
   sourcePreparedFoodId?: string | null;
   sourcePreparedFoodName?: string | null;
   foodId?: string | null;
@@ -1177,7 +1179,7 @@ export function EditLogModal({ log, groupLogs, visible, onClose, onSaved }: Edit
       const first = groupLogs[0]!;
       setBase({
         ...first,
-        foodName: first.sourcePreparedFoodName || first.foodName,
+        foodName: first.logGroupName || first.sourcePreparedFoodName || first.foodName,
         amount: total || 1,
         kcal: groupLogs.reduce((s, l) => s + l.kcal, 0),
         protein: groupLogs.reduce((s, l) => s + l.protein, 0),
@@ -1453,6 +1455,8 @@ export function EditLogModal({ log, groupLogs, visible, onClose, onSaved }: Edit
         const logGroupId = crypto.randomUUID();
         const date = toLocalDateStr(selectedDate);
         const preparedId = preparedFood!.id;
+        const groupName =
+          preparedFood?.nameHu || preparedFood?.nameEn || preparedFood?.name || base.foodName;
         for (const c of preparedComponents) {
           await logApi.create({
             foodName: c.name,
@@ -1467,6 +1471,7 @@ export function EditLogModal({ log, groupLogs, visible, onClose, onSaved }: Edit
             source: 'MANUAL',
             date,
             logGroupId,
+            logGroupName: groupName,
             sourcePreparedFoodId: preparedId,
           });
         }

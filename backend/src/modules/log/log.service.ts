@@ -96,7 +96,11 @@ export async function getLogs(
     servingSize: food?.servingSize ?? null,
     servingUnit: food?.servingUnit ?? null,
     sourcePreparedFoodName:
-      sourcePreparedFood?.nameHu ?? sourcePreparedFood?.nameEn ?? sourcePreparedFood?.name ?? null,
+      log.logGroupName ||
+      sourcePreparedFood?.nameHu ||
+      sourcePreparedFood?.nameEn ||
+      sourcePreparedFood?.name ||
+      null,
   }));
 
   return { logs: mapped, summary };
@@ -136,6 +140,7 @@ export async function createLog(
           mealType: data.mealType,
           source: data.source,
           logGroupId: data.logGroupId ?? undefined,
+          logGroupName: data.logGroupName ?? undefined,
           sourcePreparedFoodId: data.sourcePreparedFoodId ?? (food.isPrepared ? food.id : undefined),
           ...(createdAt ? { createdAt } : {}),
         },
@@ -159,6 +164,7 @@ export async function createLog(
       mealType: data.mealType,
       source: data.source,
       logGroupId: data.logGroupId ?? undefined,
+      logGroupName: data.logGroupName ?? undefined,
       sourcePreparedFoodId: data.sourcePreparedFoodId ?? undefined,
       ...(createdAt ? { createdAt } : {}),
     },
@@ -177,6 +183,7 @@ export async function updateLog(
 
   const update: Record<string, unknown> = {};
   if (data.foodName !== undefined) update.foodName = data.foodName;
+  if (data.logGroupName !== undefined) update.logGroupName = data.logGroupName;
   if (data.mealType !== undefined) update.mealType = data.mealType;
 
   const hasExplicitMacros =
@@ -237,6 +244,7 @@ type HistoryLog = {
   amount: number;
   mealType: string;
   logGroupId: string | null;
+  logGroupName: string | null;
   createdAt: Date;
   sourcePreparedFood: { name: string; nameHu: string | null; nameEn: string | null } | null;
 };
@@ -280,6 +288,7 @@ function summarizeLogs(logs: HistoryLog[], date: string, mealType: string): Meal
       seenGroups.add(gid);
       const groupLogs = logs.filter((l) => l.logGroupId === gid);
       const title =
+        log.logGroupName ||
         log.sourcePreparedFood?.nameHu ||
         log.sourcePreparedFood?.nameEn ||
         log.sourcePreparedFood?.name ||
@@ -415,6 +424,7 @@ type CopySnapshot = {
   sugar: number | null;
   amount: number;
   groupKey: string | null;
+  logGroupName: string | null;
   sourcePreparedFoodId: string | null;
 };
 
@@ -492,6 +502,7 @@ async function snapshotsFromDay(
     sugar: log.sugar,
     amount: log.amount,
     groupKey: log.logGroupId,
+    logGroupName: log.logGroupName,
     sourcePreparedFoodId: log.sourcePreparedFoodId,
   }));
 }
@@ -520,6 +531,7 @@ async function snapshotsFromTemplate(
     sugar: item.sugar,
     amount: item.amount,
     groupKey: item.groupKey,
+    logGroupName: item.groupName,
     sourcePreparedFoodId: item.sourcePreparedFoodId,
   }));
 }
@@ -588,6 +600,7 @@ async function insertCopiedLogs(
             mealType,
             source: 'MANUAL',
             logGroupId,
+            logGroupName: log.logGroupName,
             sourcePreparedFoodId: log.sourcePreparedFoodId,
             createdAt,
           },
@@ -623,6 +636,7 @@ function mapTemplate(template: {
     amount: number;
     sortOrder: number;
     groupKey: string | null;
+    groupName: string | null;
     sourcePreparedFoodId: string | null;
     sourcePreparedFood: { name: string; nameHu: string | null; nameEn: string | null } | null;
   }>;
@@ -645,7 +659,8 @@ function mapTemplate(template: {
       seen.add(item.groupKey);
       itemCount += 1;
       previewNames.push(
-        item.sourcePreparedFood?.nameHu ||
+        item.groupName ||
+          item.sourcePreparedFood?.nameHu ||
           item.sourcePreparedFood?.nameEn ||
           item.sourcePreparedFood?.name ||
           item.foodName,
@@ -677,8 +692,10 @@ function mapTemplate(template: {
       amount: i.amount,
       sortOrder: i.sortOrder,
       groupKey: i.groupKey,
+      groupName: i.groupName,
       sourcePreparedFoodId: i.sourcePreparedFoodId,
       sourcePreparedFoodName:
+        i.groupName ||
         i.sourcePreparedFood?.nameHu ||
         i.sourcePreparedFood?.nameEn ||
         i.sourcePreparedFood?.name ||
@@ -772,6 +789,7 @@ export async function createMealTemplate(
             amount: log.amount,
             sortOrder: index,
             groupKey,
+            groupName: log.logGroupName,
             sourcePreparedFoodId: log.sourcePreparedFoodId,
           };
         }),

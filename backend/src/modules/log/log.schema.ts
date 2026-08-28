@@ -15,6 +15,7 @@ export const CreateLogSchema = z.object({
   /** YYYY-MM-DD — ha meg van adva, a bejegyzés erre a napra kerül (nem a mai createdAt-re). */
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Dátum formátum: YYYY-MM-DD').optional(),
   logGroupId: z.string().uuid().optional().nullable(),
+  logGroupName: z.string().min(1).max(100).optional().nullable(),
   sourcePreparedFoodId: z.string().uuid().optional().nullable(),
 });
 
@@ -27,6 +28,7 @@ export const LogQuerySchema = z.object({
 
 export const UpdateLogSchema = z.object({
   foodName: z.string().min(1).max(100).optional(),
+  logGroupName: z.string().min(1).max(100).optional().nullable(),
   amount: z.number().min(1, 'Mennyiség min. 1g').optional(),
   mealType: z.enum(['BREAKFAST', 'TIZORAI', 'LUNCH', 'UZSONNA', 'DINNER', 'SNACK', 'OTHER']).optional(),
   kcal: z.number().min(0).optional(),

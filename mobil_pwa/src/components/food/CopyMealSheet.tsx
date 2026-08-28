@@ -75,6 +75,7 @@ function entriesFromTemplate(tpl: MealTemplate): DiaryLogLike[] {
     amount: item.amount,
     foodId: item.foodId,
     logGroupId: item.groupKey,
+    logGroupName: item.groupName,
     sourcePreparedFoodId: item.sourcePreparedFoodId,
     sourcePreparedFoodName: item.sourcePreparedFoodName,
   }));

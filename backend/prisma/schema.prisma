@@ -287,6 +287,8 @@ model DailyLog {
 
   /** Azonos UUID = egy „Hozzáadás” / egy tál (hozzávalónkénti logok). */
   logGroupId String?
+  /** Egyéni csoport / étel neve hozzávalónkénti naplózásnál (pl. AI felismerés). */
+  logGroupName String?
   /** Melyik prepared Food receptből jött (ha van). */
   sourcePreparedFoodId String?
   sourcePreparedFood   Food?   @relation("PreparedFoodSource", fields: [sourcePreparedFoodId], references: [id], onDelete: SetNull)
@@ -331,6 +333,7 @@ model MealTemplateItem {
 
   sortOrder            Int     @default(0)
   groupKey             String?
+  groupName            String?
   sourcePreparedFoodId String?
   sourcePreparedFood   Food?   @relation("TemplatePreparedFood", fields: [sourcePreparedFoodId], references: [id], onDelete: SetNull)
 
