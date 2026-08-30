@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -10,21 +10,28 @@ import {
 } from '../components/ui/Icons';
 import DoodleCharacter, { SparkleIcon } from '../components/ui/DoodleCharacter';
 import { GlassCardSimple } from '../components/ui/GlassCard';
-import { getErrorMessage } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { useAuthError } from '../hooks/useAuthError';
 import { Colors, Spacing } from '../design/tokens';
 import styles from './Auth.module.css';
+
+/** Basic email format check – same rule as backend (zod email). */
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 export default function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
+  const { resolveError } = useAuthError();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
   const [error, setError] = useState('');
+  const [forgotMsg, setForgotMsg] = useState('');
 
   const doShake = () => {
     setShake(true);
@@ -32,27 +39,35 @@ export default function LoginPage() {
   };
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
+    const emailValue = email.trim().toLowerCase();
+    const passwordValue = password.trim();
+
+    if (!emailValue || !passwordValue) {
       doShake();
       setError(t('auth.loginMissingData'));
+      return;
+    }
+    if (!isValidEmail(emailValue)) {
+      doShake();
+      setError(t('auth.invalidEmailFormat'));
       return;
     }
     setLoading(true);
     setError('');
     try {
-      await login(email.trim().toLowerCase(), password.trim());
+      await login(emailValue, passwordValue);
       navigate('/home', { replace: true });
     } catch (err) {
       doShake();
-      setError(
-        getErrorMessage(
-          err,
-          t('auth.loginFailedGeneric', 'Bejelentkezés sikertelen. Próbáld újra.'),
-        ),
-      );
+      setError(resolveError(err));
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleForgotPassword = () => {
+    setForgotMsg(t('auth.forgotPasswordUnavailable'));
+    setTimeout(() => setForgotMsg(''), 3500);
   };
 
   return (
@@ -128,9 +143,10 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
-              <button type="button" className={styles.forgot}>
+              <button type="button" className={styles.forgot} onClick={handleForgotPassword}>
                 {t('auth.forgotPassword')}
               </button>
+              {forgotMsg && <p className={styles.forgotMsg}>{forgotMsg}</p>}
             </div>
 
             {error && <p className={styles.error}>{error}</p>}

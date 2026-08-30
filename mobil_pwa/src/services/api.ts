@@ -26,14 +26,36 @@ export function getAccessToken() {
   return accessToken;
 }
 
+export type ApiErrorCode =
+  | 'AUTH_INVALID_CREDENTIALS'
+  | 'AUTH_TOKEN_EXPIRED'
+  | 'AUTH_FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'CONFLICT_EMAIL'
+  | 'CONFLICT_USERNAME'
+  | 'RATE_LIMITED'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'SERVER_ERROR'
+  | 'NETWORK_ERROR'
+  | 'TIMEOUT'
+  | 'MIXED_CONTENT';
+
 export class ApiError extends Error {
   status: number;
+  code?: ApiErrorCode;
   payload?: Record<string, unknown>;
-  constructor(status: number, message: string, payload?: Record<string, unknown>) {
+  constructor(
+    status: number,
+    message: string,
+    payload?: Record<string, unknown>,
+    code?: ApiErrorCode,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.payload = payload;
+    this.code = code;
   }
 }
 
@@ -71,17 +93,23 @@ function toNetworkApiError(error: unknown): ApiError {
       return new ApiError(
         0,
         'A böngésző blokkolta a kérést (HTTPS oldal → HTTP API). Használd a /api proxyt vagy HTTPS API-t.',
+        undefined,
+        'MIXED_CONTENT',
       );
     }
     if (/aborted|timeout/i.test(lower)) {
       return new ApiError(
         0,
         'A kérés megszakadt vagy túl sokáig tartott. Próbálj kisebb fotót, vagy ismételd meg.',
+        undefined,
+        'TIMEOUT',
       );
     }
     return new ApiError(
       0,
       'Nem érhető el a szerver. Ellenőrizd a hálózatot, az API futását, és a VITE_API_URL / proxy beállítást.',
+      undefined,
+      'NETWORK_ERROR',
     );
   }
   return new ApiError(0, raw.trim() || 'Váratlan hiba történt a kérés közben.');
@@ -160,7 +188,12 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
       apiDebug('[API] 401 → refresh');
       const refreshed = await refreshAccessTokenFromStorage();
       if (refreshed) return request<T>(path, options, false);
-      throw new ApiError(401, 'A hitelesítés frissítése sikertelen. Próbáld újra később.');
+      throw new ApiError(
+        401,
+        'A hitelesítés frissítése sikertelen. Próbáld újra később.',
+        undefined,
+        'AUTH_TOKEN_EXPIRED',
+      );
     }
 
     const responseText = await response.text();
@@ -180,6 +213,8 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
               : response.status === 413
                 ? 'A kép túl nagy. Próbálj kisebb felbontású fotót.'
                 : `Szerver hiba (HTTP ${response.status}).`,
+          undefined,
+          response.status >= 500 ? 'SERVER_ERROR' : undefined,
         );
       }
     }
@@ -216,10 +251,36 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
                   : response.status >= 500
                     ? `Szerverhiba (HTTP ${response.status}).`
                     : `A kérés sikertelen (HTTP ${response.status}).`);
+
+      // Derive a semantic code from status + backend message text
+      let code: ApiErrorCode | undefined;
+      if (response.status === 401 && isAuthForm) {
+        code = 'AUTH_INVALID_CREDENTIALS';
+      } else if (response.status === 401) {
+        code = 'AUTH_TOKEN_EXPIRED';
+      } else if (response.status === 403) {
+        code = 'AUTH_FORBIDDEN';
+      } else if (response.status === 404) {
+        code = 'NOT_FOUND';
+      } else if (response.status === 409) {
+        // Detect which conflict type from the backend message
+        const conflictText = preferred.toLowerCase();
+        if (/email/.test(conflictText)) code = 'CONFLICT_EMAIL';
+        else if (/felhasználónév|username/.test(conflictText)) code = 'CONFLICT_USERNAME';
+        else code = 'CONFLICT';
+      } else if (response.status === 429) {
+        code = 'RATE_LIMITED';
+      } else if (response.status === 413) {
+        code = 'PAYLOAD_TOO_LARGE';
+      } else if (response.status >= 500) {
+        code = 'SERVER_ERROR';
+      }
+
       throw new ApiError(
         response.status,
         msg,
         data && typeof data === 'object' ? (data as Record<string, unknown>) : undefined,
+        code,
       );
     }
     return data as T;
@@ -228,6 +289,7 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
     throw toNetworkApiError(error);
   }
 }
+
 
 export const authApi = {
   register: (data: { username: string; email: string; password: string; acceptedTerms: true }) =>

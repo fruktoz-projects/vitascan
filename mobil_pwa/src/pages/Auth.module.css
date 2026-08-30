@@ -159,6 +159,14 @@
   text-decoration: underline;
 }
 
+.forgotMsg {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7a93;
+  font-weight: 500;
+  text-align: right;
+}
+
 .error {
   margin-top: 12px;
   font-size: 13px;

@@ -14,10 +14,20 @@ import {
 } from '../components/ui/Icons';
 import { CharacterIcon, SparkleIcon } from '../components/ui/DoodleCharacter';
 import { GlassCardSimple } from '../components/ui/GlassCard';
-import { getErrorMessage } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { useAuthError } from '../hooks/useAuthError';
 import { Colors, Spacing } from '../design/tokens';
 import styles from './Auth.module.css';
+
+/** Basic email format check – same rule as backend (zod email). */
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+/** Username rules must match backend: /^[a-zA-Z0-9_]+$/, min 3, max 30. */
+function isValidUsername(value: string): boolean {
+  return /^[a-zA-Z0-9_]+$/.test(value);
+}
 
 function Field({
   label,
@@ -90,6 +100,7 @@ export default function RegisterPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const register = useAuthStore((s) => s.register);
+  const { resolveError } = useAuthError();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -116,6 +127,21 @@ export default function RegisterPage() {
       setError(t('auth.registerMissingData'));
       return;
     }
+    if (usernameValue.length < 3) {
+      doShake();
+      setError(t('auth.usernameTooShort'));
+      return;
+    }
+    if (!isValidUsername(usernameValue)) {
+      doShake();
+      setError(t('auth.usernameInvalidChars'));
+      return;
+    }
+    if (!isValidEmail(emailValue)) {
+      doShake();
+      setError(t('auth.invalidEmailFormat'));
+      return;
+    }
     if (passwordValue !== password2Value) {
       doShake();
       setError(t('auth.passwordMismatch'));
@@ -124,6 +150,11 @@ export default function RegisterPage() {
     if (passwordValue.length < 8) {
       doShake();
       setError(t('auth.weakPasswordMessage'));
+      return;
+    }
+    if (passwordValue.length > 72) {
+      doShake();
+      setError(t('auth.passwordTooLong'));
       return;
     }
     if (!accepted) {
@@ -138,12 +169,7 @@ export default function RegisterPage() {
       navigate('/home', { replace: true });
     } catch (err) {
       doShake();
-      setError(
-        getErrorMessage(
-          err,
-          t('auth.registerFailedGeneric', 'Regisztráció sikertelen. Próbáld újra.'),
-        ),
-      );
+      setError(resolveError(err));
     } finally {
       setLoading(false);
     }
