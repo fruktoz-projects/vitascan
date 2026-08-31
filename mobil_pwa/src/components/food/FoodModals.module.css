@@ -179,6 +179,132 @@
   text-align: center;
 }
 
+.aiProgressCard {
+  margin-top: 4px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1.5px solid var(--stroke);
+  border-radius: 18px;
+  box-shadow: 2.5px 2.5px 0 var(--shadow-hard);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: aiProgressFadeIn 0.22s ease-out;
+}
+
+@keyframes aiProgressFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.aiProgressHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.aiProgressStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.aiProgressDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff9e50;
+  border: 1px solid var(--stroke);
+  flex-shrink: 0;
+  animation: aiPulseDot 1.4s infinite ease-in-out;
+}
+
+@keyframes aiPulseDot {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+}
+
+.aiProgressStepText {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--stroke);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.aiProgressPercent {
+  font-size: 13px;
+  font-weight: 900;
+  color: #ff9e50;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.aiProgressTrack {
+  height: 12px;
+  background: #f0eded;
+  border-radius: 999px;
+  border: 1.5px solid var(--stroke);
+  overflow: hidden;
+  position: relative;
+}
+
+.aiProgressFill {
+  height: 100%;
+  min-width: 6px;
+  background: linear-gradient(90deg, #ffb77d 0%, #ff9e50 100%);
+  border-right: 1.5px solid var(--stroke);
+  border-radius: 999px;
+  position: relative;
+  overflow: hidden;
+  transition: width 0.3s cubic-bezier(0.2, 0.8, 0.4, 1);
+}
+
+.aiProgressStripes {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  font-size: 18px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: 3px;
+  opacity: 0.32;
+  white-space: nowrap;
+  width: 800px;
+  animation: aiProgressStripesSlide 15s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes aiProgressStripesSlide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-60px);
+  }
+}
+
+
+
 .headerActions {
   display: flex;
   align-items: center;

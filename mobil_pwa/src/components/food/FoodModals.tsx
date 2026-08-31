@@ -2309,6 +2309,7 @@ function FoodDataFormModal({
   const [dialog, setDialog] = useState<{ title: string; message: string } | null>(null);
   const [aiView, setAiView] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
   const [aiPreviewUrl, setAiPreviewUrl] = useState<string | null>(null);
   const [aiImageFile, setAiImageFile] = useState<File | null>(null);
   const [approxNote, setApproxNote] = useState<string | null>(null);
@@ -2394,6 +2395,27 @@ function FoodDataFormModal({
       if (aiPreviewUrl) URL.revokeObjectURL(aiPreviewUrl);
     };
   }, [aiPreviewUrl]);
+
+  useEffect(() => {
+    if (!aiBusy) {
+      setAiProgress(0);
+      return;
+    }
+    setAiProgress(5);
+    const steps = [
+      { delay: 400, value: 20 },
+      { delay: 900, value: 40 },
+      { delay: 1800, value: 58 },
+      { delay: 3000, value: 72 },
+      { delay: 4500, value: 84 },
+      { delay: 6500, value: 91 },
+      { delay: 9000, value: 95 },
+    ];
+    const timers = steps.map(({ delay, value }) =>
+      setTimeout(() => setAiProgress(value), delay),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [aiBusy]);
 
   if (!visible) return null;
 
@@ -2723,8 +2745,26 @@ function FoodDataFormModal({
                     disabled={aiBusy || !aiImageFile}
                     onClick={runAiLabelFill}
                   >
-                    {aiBusy ? '...' : t('food.aiFill.run')}
+                    {aiBusy ? t('food.aiFill.run') : t('food.aiFill.run')}
                   </button>
+                  {aiBusy && (
+                    <div className={styles.aiProgressCard} aria-live="polite" role="status">
+                      <div className={styles.aiProgressHead}>
+                        <div className={styles.aiProgressStatus}>
+                          <span className={styles.aiProgressDot} />
+                          <span className={styles.aiProgressStepText}>{t('food.aiFill.run')}</span>
+                        </div>
+                        <span className={styles.aiProgressPercent}>{aiProgress}%</span>
+                      </div>
+                      <div className={styles.aiProgressTrack}>
+                        <div className={styles.aiProgressFill} style={{ width: `${aiProgress}%` }}>
+                          <span className={styles.aiProgressStripes}>
+                            {'//////// //////// //////// //////// //////// ////////'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </GlassCardSimple>
               <div className={styles.scrollSpacer} />
